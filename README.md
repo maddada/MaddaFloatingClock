@@ -4,7 +4,9 @@ A customizable floating clock for macOS that stays on top of all windows.
 
 Based on [FloatClock by kolbusa](https://github.com/kolbusa/FloatClock).
 
-### How to install:
+<br />
+
+## How to install:
 You just need the Xcode Command Line Tools. Run:
 `xcode-select --install`
 
@@ -17,7 +19,9 @@ This command builds the .app file then moves it to your Applications folder.
 
 You can add it to login items to make it auto start (it'll remember last position).
 
-### 2 optional timers:
+<br />
+
+## 2 types of timers (optional):
 
 Focus Timer:
 <br /><br />
@@ -27,12 +31,22 @@ Pomodoro Timer:
 <br /><br />
 <img width="387" height="58" alt="2025-12-25_CleanShot_03-06-53" src="https://github.com/user-attachments/assets/ac73df27-b181-4100-b361-65fad64a1c10" />
 
-### Super configurable:
+<br />
+
+## Super configurable:
 <img width="500" alt="2025-12-25_Vivaldi Snapshot_03-01-40" src="https://github.com/user-attachments/assets/747c47aa-b554-4b67-a125-9566326d6036" />
 
-## Recommandation: Hide the menu bar clock by switching this setting to analog.
+<br />
+<br />
+
+## Recommandation:
+
+Hide the menu bar clock by switching this setting to analog.
 
 <img width="500"  alt="2025-12-25_System Settings_03-48-46" src="https://github.com/user-attachments/assets/e746da60-16f2-4cae-b2fd-4e17b33168e5" />
+
+<br />
+<br />
 
 ## Features & Settings
 
@@ -55,6 +69,8 @@ Pomodoro Timer:
 - **Always on top** - Floats above all windows on all spaces
 - **Menu bar icon** - Shows current day of week and date
 
+<br />
+
 ## Per-Monitor Position Memory
 
 The clock remembers its position separately for each monitor. This is useful when you switch between different display setups:
@@ -64,6 +80,8 @@ The clock remembers its position separately for each monitor. This is useful whe
 - **Multi-monitor setups** - When multiple monitors are connected, the clock appears on the largest screen and treats that as a separate configuration.
 
 Positions are identified by monitor name and resolution (e.g., "Built-in Retina Display_1728x1117" or "LG HDR 4K_3840x2160").
+
+<br />
 
 ## Build Instructions
 
