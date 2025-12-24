@@ -4,6 +4,10 @@ A customizable floating clock for macOS that stays on top of all windows.
 
 Based on [FloatClock by kolbusa](https://github.com/kolbusa/FloatClock).
 
+To install:
+Just run `make install` to build the .app file then move it to your Applications folder.
+You can add it to login items to make it auto start.
+
 ## Features & Settings
 
 - **Time format** - Customizable time display format (e.g., hh:mm a, HH:mm:ss)
@@ -24,7 +28,6 @@ Based on [FloatClock by kolbusa](https://github.com/kolbusa/FloatClock).
 - **Draggable window** - Shift+drag to reposition, position is saved
 - **Always on top** - Floats above all windows on all spaces
 - **Menu bar icon** - Shows current day of week and date
-- **Multi-monitor support** - Works across different screen setups
 
 ## Build Instructions
 
