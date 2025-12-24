@@ -2,7 +2,7 @@
 
 A customizable floating clock for macOS that stays on top of all windows.
 
-Based on [FloatClock by kolbusa](https://github.com/kolbusa/FloatClock).
+Based on [FloatClock by kolbusa](https://github.com/kolbusa/FloatClock) which is much more minimal but gave me a good starting point. Much thanks for that.
 
 <br />
 
