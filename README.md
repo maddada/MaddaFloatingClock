@@ -28,8 +28,11 @@ Pomodoro Timer:
 <img width="387" height="58" alt="2025-12-25_CleanShot_03-06-53" src="https://github.com/user-attachments/assets/ac73df27-b181-4100-b361-65fad64a1c10" />
 
 ### Super configurable:
-<img width="1196" height="1496" alt="2025-12-25_Vivaldi Snapshot_03-01-40" src="https://github.com/user-attachments/assets/747c47aa-b554-4b67-a125-9566326d6036" />
+<img width="500" alt="2025-12-25_Vivaldi Snapshot_03-01-40" src="https://github.com/user-attachments/assets/747c47aa-b554-4b67-a125-9566326d6036" />
 
+## Recommandation: Hide the menu bar clock by switching this setting to analog.
+
+<img width="500"  alt="2025-12-25_System Settings_03-48-46" src="https://github.com/user-attachments/assets/e746da60-16f2-4cae-b2fd-4e17b33168e5" />
 
 ## Features & Settings
 
