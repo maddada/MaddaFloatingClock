@@ -5,11 +5,23 @@ A customizable floating clock for macOS that stays on top of all windows.
 Based on [FloatClock by kolbusa](https://github.com/kolbusa/FloatClock).
 
 To install:
-Just run `make install` to build the .app file then move it to your Applications folder.
-You can add it to login items to make it auto start.
+Just run `make install` which builds the .app file then moves it to your Applications folder.
+You can add it to login items to make it auto start (remembers the location on each different screen).
 
-<img width="794" height="804" alt="2025-12-25_Madda Floating Clock_02-55-41" src="https://github.com/user-attachments/assets/c5f157ea-3d08-4fa0-b679-b3d9a1f1cd48" />
-<img width="853" height="730" alt="2025-12-25_Madda Floating Clock_02-53-45" src="https://github.com/user-attachments/assets/b20d8c3e-6a5a-4ead-bcc3-e6e4a7144662" />
+
+### 2 optional timers:
+
+Focus Timer:
+<br /><br />
+<img width="387" height="58" alt="2025-12-25_CleanShot_03-06-37" src="https://github.com/user-attachments/assets/8bdceb98-31d1-48b9-b648-fb0987087c2d" />
+
+Pomodoro Timer:
+<br /><br />
+<img width="387" height="58" alt="2025-12-25_CleanShot_03-06-53" src="https://github.com/user-attachments/assets/ac73df27-b181-4100-b361-65fad64a1c10" />
+
+### Super configurable:
+<img width="1196" height="1496" alt="2025-12-25_Vivaldi Snapshot_03-01-40" src="https://github.com/user-attachments/assets/747c47aa-b554-4b67-a125-9566326d6036" />
+
 
 ## Features & Settings
 
