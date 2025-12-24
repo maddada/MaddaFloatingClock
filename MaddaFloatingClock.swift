@@ -53,6 +53,7 @@ struct SettingsKeys {
     static let clickToShowTimerEnabled = "clickToShowTimerEnabled"
     static let timerMode = "timerMode" // "stopwatch" or "pomodoro"
     static let timerGap = "timerGap"
+    static let timerSide = "timerSide" // 0 = left, 1 = right
     static let pomodoroWorkDuration = "pomodoroWorkDuration"
     static let pomodoroBreakDuration = "pomodoroBreakDuration"
     static let pomodoroLongBreakDuration = "pomodoroLongBreakDuration"
@@ -248,6 +249,19 @@ class SettingsManager {
         }
         set {
             defaults.set(newValue, forKey: SettingsKeys.timerGap)
+        }
+    }
+
+    // Which side timer appears on: 0 = left, 1 = right
+    var timerSide: Int {
+        get {
+            if defaults.object(forKey: SettingsKeys.timerSide) == nil {
+                return 0 // default left
+            }
+            return defaults.integer(forKey: SettingsKeys.timerSide)
+        }
+        set {
+            defaults.set(newValue, forKey: SettingsKeys.timerSide)
         }
     }
 
@@ -472,6 +486,7 @@ class SettingsWindowController: NSWindowController, NSWindowDelegate {
     var lineSpacingRow: NSStackView!
     var dateSizeRow: NSStackView!
     var timerGapRow: NSStackView!
+    var timerSideRow: NSStackView!
     var timerModeRow: NSStackView!
     var timerExplanationLabel: NSTextField!
     var timerHistoryButton: NSButton!
@@ -486,7 +501,7 @@ class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 380, height: 850),
+            contentRect: NSRect(x: 0, y: 0, width: 380, height: 100),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -503,6 +518,12 @@ class SettingsWindowController: NSWindowController, NSWindowDelegate {
         }
 
         setupUI()
+
+        // Size window to fit content vertically, keep width at 380
+        window.layoutIfNeeded()
+        let fittingSize = window.contentView?.fittingSize ?? NSZeroSize
+        let newFrame = NSRect(origin: window.frame.origin, size: NSSize(width: 380, height: fittingSize.height))
+        window.setFrame(newFrame, display: true)
     }
 
     func windowDidMove(_ notification: Notification) {
@@ -517,7 +538,7 @@ class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let settings = SettingsManager.shared
         let labelWidth: CGFloat = 100
         let rowSpacing: CGFloat = 12
-        let sectionSpacing: CGFloat = 24
+        let sectionSpacing: CGFloat = 35
 
         // Helper to create a label with fixed width
         func makeLabel(_ text: String) -> NSTextField {
@@ -539,7 +560,7 @@ class SettingsWindowController: NSWindowController, NSWindowDelegate {
         // Helper to create section header
         func makeSectionHeader(_ text: String) -> NSTextField {
             let header = NSTextField(labelWithString: text)
-            header.font = NSFont.boldSystemFont(ofSize: 12)
+            header.font = NSFont.boldSystemFont(ofSize: 16)
             header.textColor = NSColor.secondaryLabelColor
             return header
         }
@@ -551,6 +572,30 @@ class SettingsWindowController: NSWindowController, NSWindowDelegate {
         mainStack.spacing = rowSpacing
         mainStack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
         mainStack.translatesAutoresizingMaskIntoConstraints = false
+
+        // ═══════════════════════════════════════
+        // INFORMATION SECTION
+        // ═══════════════════════════════════════
+
+        mainStack.addArrangedSubview(makeSectionHeader("Madda Floating Clock"))
+
+        let infoText = """
+        This is a minimal, always-on-top desktop clock, focus/pomodoro timer for macOS.
+
+        • Right-click on clock to open settings
+        • Hold Shift and drag to move the clock
+        • Post issues or suggestions on GitHub
+        """
+        let infoLabel = NSTextField(wrappingLabelWithString: infoText)
+        infoLabel.font = NSFont.systemFont(ofSize: 15)
+        infoLabel.textColor = NSColor.secondaryLabelColor
+        mainStack.addArrangedSubview(infoLabel)
+
+        // Section gap
+        let infoSectionSpacer = NSView()
+        infoSectionSpacer.heightAnchor.constraint(equalToConstant: 0).isActive = true
+        mainStack.addArrangedSubview(infoSectionSpacer)
+        mainStack.setCustomSpacing(20, after: infoSectionSpacer)
 
         // ═══════════════════════════════════════
         // TIME SECTION
@@ -657,8 +702,11 @@ class SettingsWindowController: NSWindowController, NSWindowDelegate {
         dateSizeRow.isHidden = !settings.showDate
         mainStack.addArrangedSubview(dateSizeRow)
 
-        // Section gap
-        mainStack.setCustomSpacing(sectionSpacing, after: dateSizeRow)
+        // Section gap - use invisible spacer so spacing persists even when date elements are hidden
+        let dateSectionSpacer = NSView()
+        dateSectionSpacer.heightAnchor.constraint(equalToConstant: 0).isActive = true
+        mainStack.addArrangedSubview(dateSectionSpacer)
+        mainStack.setCustomSpacing(sectionSpacing, after: dateSectionSpacer)
 
         // ═══════════════════════════════════════
         // STYLE SECTION
@@ -771,6 +819,14 @@ class SettingsWindowController: NSWindowController, NSWindowDelegate {
         timerGapRow.isHidden = !settings.clickToShowTimerEnabled
         mainStack.addArrangedSubview(timerGapRow)
 
+        // Timer side control
+        let timerSideControl = NSSegmentedControl(labels: ["Left", "Right"], trackingMode: .selectOne, target: self, action: #selector(timerSideChanged))
+        timerSideControl.selectedSegment = settings.timerSide
+        timerSideControl.tag = 998 // Tag to find it later
+        timerSideRow = makeRow([makeLabel("Timer side:"), timerSideControl])
+        timerSideRow.isHidden = !settings.clickToShowTimerEnabled
+        mainStack.addArrangedSubview(timerSideRow)
+
         // Stopwatch explanation (shown when mode is stopwatch)
         let showStopwatch = settings.clickToShowTimerEnabled && !settings.isPomodoroMode
         timerExplanationLabel = NSTextField(wrappingLabelWithString: "Click clock to start • Click timer to pause/resume\nClick clock to stop and save time")
@@ -858,8 +914,11 @@ class SettingsWindowController: NSWindowController, NSWindowDelegate {
         timerHistoryButton.isHidden = !settings.clickToShowTimerEnabled
         mainStack.addArrangedSubview(timerHistoryButton)
 
-        // Section gap
-        mainStack.setCustomSpacing(sectionSpacing, after: timerHistoryButton)
+        // Section gap - use invisible spacer so spacing persists even when timer elements are hidden
+        let timerSectionSpacer = NSView()
+        timerSectionSpacer.heightAnchor.constraint(equalToConstant: 0).isActive = true
+        mainStack.addArrangedSubview(timerSectionSpacer)
+        mainStack.setCustomSpacing(sectionSpacing, after: timerSectionSpacer)
 
         // ═══════════════════════════════════════
         // CHIME SECTION
@@ -903,28 +962,33 @@ class SettingsWindowController: NSWindowController, NSWindowDelegate {
         // BUTTONS
         // ═══════════════════════════════════════
 
+        mainStack.addArrangedSubview(makeSectionHeader("OTHER"))
+
         let githubButton = NSButton(title: "Visit Github", target: self, action: #selector(visitGithub))
         githubButton.bezelStyle = .rounded
+        githubButton.widthAnchor.constraint(equalToConstant: 111).isActive = true
 
         let resetButton = NSButton(title: "Reset Position", target: self, action: #selector(resetPosition))
         resetButton.bezelStyle = .rounded
+        resetButton.widthAnchor.constraint(equalToConstant: 111).isActive = true
 
         let restartButton = NSButton(title: "Restart", target: self, action: #selector(restartApp))
         restartButton.bezelStyle = .rounded
+        restartButton.widthAnchor.constraint(equalToConstant: 111).isActive = true
 
         let quitButton = NSButton(title: "Quit", target: self, action: #selector(quitApp))
         quitButton.bezelStyle = .rounded
+        quitButton.widthAnchor.constraint(equalToConstant: 111).isActive = true
 
-        let buttonRow = NSStackView(views: [githubButton, resetButton, restartButton, quitButton])
-        buttonRow.orientation = .horizontal
-        buttonRow.spacing = 10
-        mainStack.addArrangedSubview(buttonRow)
+        let buttonRow1 = NSStackView(views: [githubButton, resetButton])
+        buttonRow1.orientation = .horizontal
+        buttonRow1.spacing = 10
+        mainStack.addArrangedSubview(buttonRow1)
 
-        // Tip at the bottom
-        let tipLabel = NSTextField(labelWithString: "Tips:\n• Right-click on clock to open settings\n• Hold shift and drag the clock to move it around the screen\n• Post issues or suggestions on Github")
-        tipLabel.font = NSFont.systemFont(ofSize: 11)
-        tipLabel.textColor = NSColor.tertiaryLabelColor
-        mainStack.addArrangedSubview(tipLabel)
+        let buttonRow2 = NSStackView(views: [restartButton, quitButton])
+        buttonRow2.orientation = .horizontal
+        buttonRow2.spacing = 10
+        mainStack.addArrangedSubview(buttonRow2)
 
         // Add main stack to content view
         contentView.addSubview(mainStack)
@@ -1077,6 +1141,7 @@ class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
         timerModeRow.isHidden = !enabled
         timerGapRow.isHidden = !enabled
+        timerSideRow.isHidden = !enabled
         timerHistoryButton.isHidden = !enabled
 
         // Show appropriate explanation based on mode
@@ -1108,6 +1173,11 @@ class SettingsWindowController: NSWindowController, NSWindowDelegate {
         if let label = sender.superview?.subviews.first(where: { $0.tag == 999 }) as? NSTextField {
             label.stringValue = "\(gap) px"
         }
+        onSettingsChanged?()
+    }
+
+    @objc func timerSideChanged(_ sender: NSSegmentedControl) {
+        SettingsManager.shared.timerSide = sender.selectedSegment
         onSettingsChanged?()
     }
 
@@ -1262,13 +1332,35 @@ class Clock: NSObject, NSApplicationDelegate {
     var pomodoroSecondsRemaining: Int = 0
     var pomodoroCompletedSessions: Int = 0
 
+    // Calculate how much the window origin needs to shift left when timer is on the left
+    func calculateTimerLeftOffset() -> CGFloat {
+        guard stopwatchVisible && SettingsManager.shared.timerSide == 0 else { return 0 }
+
+        let settings = SettingsManager.shared
+        let font = settings.getFont()
+        let timeAttributes: [NSAttributedString.Key: Any] = [.font: font]
+        let timerText = "00:00:00"
+        let timerWidth = timerText.size(withAttributes: timeAttributes).width + 10
+        let separatorText = ""
+        let separatorWidth = separatorText.size(withAttributes: timeAttributes).width
+        let halfGap = settings.timerGap / 2
+
+        return round(timerWidth + halfGap + separatorWidth + halfGap)
+    }
+
     func updateWindowPosition() {
+        let timerOffset = calculateTimerLeftOffset()
+
         if let savedPos = SettingsManager.shared.windowPosition {
-            window.setFrameOrigin(savedPos)
+            // Adjust saved position to account for timer on left
+            let adjustedPos = NSPoint(x: savedPos.x - timerOffset, y: savedPos.y)
+            window.setFrameOrigin(adjustedPos)
         } else if let screen = window.screen {
             let pos = calcWindowPosition(windowSize: self.window.frame.size,
                                          screenSize: screen.frame.size)
-            window.setFrameOrigin(pos)
+            // Adjust calculated position to account for timer on left
+            let adjustedPos = NSPoint(x: pos.x - timerOffset, y: pos.y)
+            window.setFrameOrigin(adjustedPos)
         }
     }
 
@@ -1613,14 +1705,14 @@ class Clock: NSObject, NSApplicationDelegate {
         let timeFormatter = DateFormatter()
         timeFormatter.dateFormat = settings.timeFormat
         let sampleTime = timeFormatter.string(from: Date())
-        var clockWidth = sampleTime.size(withAttributes: timeAttributes).width + 20
+        var clockWidth = sampleTime.size(withAttributes: timeAttributes).width + 22
 
         if settings.showDate {
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = settings.dateFormat
             let sampleDate = dateFormatter.string(from: Date())
             let dateAttributes: [NSAttributedString.Key: Any] = [.font: dateFont]
-            let dateWidth = sampleDate.size(withAttributes: dateAttributes).width + 20
+            let dateWidth = sampleDate.size(withAttributes: dateAttributes).width + 22
             clockWidth = max(clockWidth, dateWidth)
         }
 
@@ -1631,8 +1723,8 @@ class Clock: NSObject, NSApplicationDelegate {
         let timerWidth = timerText.size(withAttributes: timeAttributes).width + 10
         let separatorWidth = separatorText.size(withAttributes: timeAttributes).width
 
-        // Determine positions based on alignment
-        let isRightAligned = settings.textAlignment == 2
+        // Determine positions based on timer side setting
+        let timerOnLeft = settings.timerSide == 0
         let halfGap = timerGap / 2
 
         var clockX: CGFloat = 0
@@ -1640,16 +1732,16 @@ class Clock: NSObject, NSApplicationDelegate {
         var timerX: CGFloat = 0
 
         if stopwatchVisible {
-            if isRightAligned {
+            if timerOnLeft {
                 // Timer on left: [timer] [halfGap] [|] [halfGap] [clock]
                 timerX = 0
-                separatorX = timerWidth + halfGap
-                clockX = separatorX + separatorWidth + halfGap
+                separatorX = round(timerWidth + halfGap)
+                clockX = round(separatorX + separatorWidth + halfGap)
             } else {
                 // Timer on right: [clock] [halfGap] [|] [halfGap] [timer]
                 clockX = 0
-                separatorX = clockWidth + halfGap
-                timerX = separatorX + separatorWidth + halfGap
+                separatorX = round(clockWidth + halfGap)
+                timerX = round(separatorX + separatorWidth + halfGap)
             }
         } else {
             clockX = 0
@@ -1695,7 +1787,7 @@ class Clock: NSObject, NSApplicationDelegate {
         let timeAttributes: [NSAttributedString.Key: Any] = [.font: font]
         let timeSize = sampleTime.size(withAttributes: timeAttributes)
 
-        var width = timeSize.width + 20
+        var width = timeSize.width + 22
         var height = timeSize.height + 8
 
         if settings.showDate {
@@ -1707,7 +1799,7 @@ class Clock: NSObject, NSApplicationDelegate {
             let dateAttributes: [NSAttributedString.Key: Any] = [.font: dateFont]
             let dateSize = sampleDate.size(withAttributes: dateAttributes)
 
-            width = max(timeSize.width, dateSize.width) + 20
+            width = max(timeSize.width, dateSize.width) + 22
             height = timeSize.height + dateSize.height + settings.lineSpacing + 2
         }
 
