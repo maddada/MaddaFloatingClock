@@ -8,6 +8,9 @@ To install:
 Just run `make install` to build the .app file then move it to your Applications folder.
 You can add it to login items to make it auto start.
 
+<img width="794" height="804" alt="2025-12-25_Madda Floating Clock_02-55-41" src="https://github.com/user-attachments/assets/c5f157ea-3d08-4fa0-b679-b3d9a1f1cd48" />
+<img width="853" height="730" alt="2025-12-25_Madda Floating Clock_02-53-45" src="https://github.com/user-attachments/assets/b20d8c3e-6a5a-4ead-bcc3-e6e4a7144662" />
+
 ## Features & Settings
 
 - **Time format** - Customizable time display format (e.g., hh:mm a, HH:mm:ss)
