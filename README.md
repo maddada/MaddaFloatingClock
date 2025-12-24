@@ -4,10 +4,18 @@ A customizable floating clock for macOS that stays on top of all windows.
 
 Based on [FloatClock by kolbusa](https://github.com/kolbusa/FloatClock).
 
-To install:
-Just run `make install` which builds the .app file then moves it to your Applications folder.
-You can add it to login items to make it auto start (remembers the location on each different screen).
+### How to install:
+You just need the Xcode Command Line Tools. Run:
+`xcode-select --install`
 
+This opens a dialog to install the command line tools (includes Swift, git, make, etc.). It's about 1-2 GB and takes a few minutes.
+
+After that completes, you can run:
+`make install`
+
+This command builds the .app file then moves it to your Applications folder.
+
+You can add it to login items to make it auto start (it'll remember last position).
 
 ### 2 optional timers:
 
