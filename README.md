@@ -44,6 +44,16 @@ Pomodoro Timer:
 - **Always on top** - Floats above all windows on all spaces
 - **Menu bar icon** - Shows current day of week and date
 
+## Per-Monitor Position Memory
+
+The clock remembers its position separately for each monitor. This is useful when you switch between different display setups:
+
+- **Different positions per screen** - Set the clock position on your external 4K monitor, then set a different position on your laptop screen. Each is saved independently.
+- **Automatic restoration** - When you unplug your external monitor, the clock restores to your saved laptop screen position. Plug the external monitor back in and it returns to that monitor's saved position.
+- **Multi-monitor setups** - When multiple monitors are connected, the clock appears on the largest screen and treats that as a separate configuration.
+
+Positions are identified by monitor name and resolution (e.g., "Built-in Retina Display_1728x1117" or "LG HDR 4K_3840x2160").
+
 ## Build Instructions
 
 Requires Swift

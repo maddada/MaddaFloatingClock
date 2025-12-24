@@ -61,6 +61,7 @@ struct SettingsKeys {
     static let settingsWindowX = "settingsWindowX"
     static let settingsWindowY = "settingsWindowY"
     static let hasSettingsWindowPosition = "hasSettingsWindowPosition"
+    static let perMonitorPositions = "perMonitorPositions"
 }
 
 // MARK: - Settings Manager
@@ -68,8 +69,67 @@ class SettingsManager {
     static let shared = SettingsManager()
     private let defaults = UserDefaults.standard
 
+    // Generate a unique identifier for a screen based on its name and resolution
+    static func screenIdentifier(for screen: NSScreen) -> String {
+        let size = screen.frame.size
+        let name = screen.localizedName
+        return "\(name)_\(Int(size.width))x\(Int(size.height))"
+    }
+
+    // Get the primary screen to use (largest screen in multi-monitor setups)
+    static func primaryScreen() -> NSScreen? {
+        guard let screens = NSScreen.screens as [NSScreen]?, !screens.isEmpty else {
+            return NSScreen.main
+        }
+        if screens.count == 1 {
+            return screens.first
+        }
+        // Multi-monitor: return the largest screen
+        return screens.max(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height })
+    }
+
+    // Per-monitor positions dictionary
+    private var perMonitorPositions: [String: [String: Double]] {
+        get {
+            return defaults.dictionary(forKey: SettingsKeys.perMonitorPositions) as? [String: [String: Double]] ?? [:]
+        }
+        set {
+            defaults.set(newValue, forKey: SettingsKeys.perMonitorPositions)
+        }
+    }
+
+    // Get window position for a specific screen
+    func windowPosition(for screen: NSScreen) -> NSPoint? {
+        let screenId = SettingsManager.screenIdentifier(for: screen)
+        guard let posDict = perMonitorPositions[screenId],
+              let x = posDict["x"],
+              let y = posDict["y"] else {
+            return nil
+        }
+        return NSPoint(x: x, y: y)
+    }
+
+    // Save window position for a specific screen
+    func setWindowPosition(_ position: NSPoint?, for screen: NSScreen) {
+        let screenId = SettingsManager.screenIdentifier(for: screen)
+        var positions = perMonitorPositions
+        if let pos = position {
+            positions[screenId] = ["x": Double(pos.x), "y": Double(pos.y)]
+        } else {
+            positions.removeValue(forKey: screenId)
+        }
+        perMonitorPositions = positions
+    }
+
+    // Legacy windowPosition for backwards compatibility (uses current primary screen)
     var windowPosition: NSPoint? {
         get {
+            // First check per-monitor positions for primary screen
+            if let screen = SettingsManager.primaryScreen(),
+               let pos = windowPosition(for: screen) {
+                return pos
+            }
+            // Fall back to legacy single-position storage for migration
             guard defaults.bool(forKey: SettingsKeys.hasCustomPosition) else { return nil }
             return NSPoint(
                 x: defaults.double(forKey: SettingsKeys.windowX),
@@ -77,6 +137,10 @@ class SettingsManager {
             )
         }
         set {
+            if let pos = newValue, let screen = SettingsManager.primaryScreen() {
+                setWindowPosition(pos, for: screen)
+            }
+            // Keep legacy storage for backwards compatibility
             if let pos = newValue {
                 defaults.set(true, forKey: SettingsKeys.hasCustomPosition)
                 defaults.set(pos.x, forKey: SettingsKeys.windowX)
@@ -85,6 +149,12 @@ class SettingsManager {
                 defaults.set(false, forKey: SettingsKeys.hasCustomPosition)
             }
         }
+    }
+
+    // Check if there's a saved position for a specific screen
+    func hasPosition(for screen: NSScreen) -> Bool {
+        let screenId = SettingsManager.screenIdentifier(for: screen)
+        return perMonitorPositions[screenId] != nil
     }
 
     var textColor: NSColor {
@@ -1349,13 +1419,15 @@ class Clock: NSObject, NSApplicationDelegate {
     }
 
     func updateWindowPosition() {
+        guard let screen = SettingsManager.primaryScreen() else { return }
         let timerOffset = calculateTimerLeftOffset()
+        let settings = SettingsManager.shared
 
-        if let savedPos = SettingsManager.shared.windowPosition {
+        if let savedPos = settings.windowPosition(for: screen) {
             // Adjust saved position to account for timer on left
             let adjustedPos = NSPoint(x: savedPos.x - timerOffset, y: savedPos.y)
             window.setFrameOrigin(adjustedPos)
-        } else if let screen = window.screen {
+        } else {
             let pos = calcWindowPosition(windowSize: self.window.frame.size,
                                          screenSize: screen.frame.size)
             // Adjust calculated position to account for timer on left
@@ -1373,11 +1445,9 @@ class Clock: NSObject, NSApplicationDelegate {
             forName: NSApplication.didChangeScreenParametersNotification,
             object: NSApplication.shared,
             queue: OperationQueue.main
-        ) {
-            notification -> Void in
-            if SettingsManager.shared.windowPosition == nil {
-                self.updateWindowPosition()
-            }
+        ) { [weak self] _ in
+            // When screen configuration changes, restore position for the new primary screen
+            self?.updateWindowPosition()
         }
     }
 
@@ -1940,11 +2010,12 @@ class Clock: NSObject, NSApplicationDelegate {
 
     func initWindow(size: CGSize) -> NSWindow {
         let settings = SettingsManager.shared
+        let screen = SettingsManager.primaryScreen() ?? NSScreen.main!
         let pos: CGPoint
-        if let savedPos = settings.windowPosition {
+        if let savedPos = settings.windowPosition(for: screen) {
             pos = savedPos
         } else {
-            pos = calcWindowPosition(windowSize: size, screenSize: NSScreen.main!.frame.size)
+            pos = calcWindowPosition(windowSize: size, screenSize: screen.frame.size)
         }
 
         let rect = NSMakeRect(pos.x, pos.y, size.width, size.height)
@@ -1957,7 +2028,10 @@ class Clock: NSObject, NSApplicationDelegate {
 
         draggableView = DraggableView(frame: NSMakeRect(0, 0, size.width, size.height))
         draggableView.onPositionChanged = { newPos in
-            SettingsManager.shared.windowPosition = newPos
+            // Save position for the current primary screen
+            if let currentScreen = SettingsManager.primaryScreen() {
+                SettingsManager.shared.setWindowPosition(newPos, for: currentScreen)
+            }
         }
         draggableView.onClockClicked = { [weak self] in
             guard let self = self else { return }
