@@ -561,11 +561,14 @@ class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
         setupUI()
 
-        // Size window to fit content vertically, keep width at 380
+        // Size window to fit content vertically, keep width at 380, max height 600
         window.layoutIfNeeded()
-        let fittingSize = window.contentView?.fittingSize ?? NSZeroSize
-        let newFrame = NSRect(origin: window.frame.origin, size: NSSize(width: 380, height: fittingSize.height))
-        window.setFrame(newFrame, display: true)
+        if let docView = (window.contentView?.subviews.first as? NSScrollView)?.documentView {
+            let naturalHeight = docView.fittingSize.height
+            let clampedHeight = min(naturalHeight, 600)
+            let newFrame = NSRect(origin: window.frame.origin, size: NSSize(width: 380, height: clampedHeight))
+            window.setFrame(newFrame, display: true)
+        }
     }
 
     func windowDidMove(_ notification: Notification) {
@@ -1032,13 +1035,35 @@ class SettingsWindowController: NSWindowController, NSWindowDelegate {
         buttonRow2.spacing = 10
         mainStack.addArrangedSubview(buttonRow2)
 
-        // Add main stack to content view
-        contentView.addSubview(mainStack)
+        // Wrap main stack in a scroll view with max height
+        let scrollView = NSScrollView()
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.drawsBackground = false
+        scrollView.automaticallyAdjustsContentInsets = false
+        scrollView.contentInsets = NSEdgeInsetsZero
+
+        let documentView = NSView()
+        documentView.translatesAutoresizingMaskIntoConstraints = false
+        documentView.addSubview(mainStack)
+
+        scrollView.documentView = documentView
+
         NSLayoutConstraint.activate([
-            mainStack.topAnchor.constraint(equalTo: contentView.topAnchor),
-            mainStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            mainStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            mainStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
+            mainStack.topAnchor.constraint(equalTo: documentView.topAnchor),
+            mainStack.leadingAnchor.constraint(equalTo: documentView.leadingAnchor),
+            mainStack.trailingAnchor.constraint(equalTo: documentView.trailingAnchor),
+            mainStack.bottomAnchor.constraint(equalTo: documentView.bottomAnchor),
+            documentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+        ])
+
+        contentView.addSubview(scrollView)
+        NSLayoutConstraint.activate([
+            scrollView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
         ])
     }
 
