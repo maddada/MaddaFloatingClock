@@ -41,6 +41,34 @@ class SettingsManager {
     static let shared = SettingsManager()
     private let defaults = UserDefaults.standard
 
+    private init() {
+        defaults.register(defaults: [
+            SettingsKeys.colorRed: 1.0,
+            SettingsKeys.colorGreen: 1.0,
+            SettingsKeys.colorBlue: 1.0,
+            SettingsKeys.opacity: 0.75,
+            SettingsKeys.fontName: "Arial Rounded MT Bold",
+            SettingsKeys.fontWeight: "regular",
+            SettingsKeys.fontSize: 21.0,
+            SettingsKeys.showDate: true,
+            SettingsKeys.timeFormat: "hh:mm a",
+            SettingsKeys.dateFormat: "EEE, MM-dd",
+            SettingsKeys.dateFontSize: 18.0,
+            SettingsKeys.lineSpacing: 0.5,
+            SettingsKeys.textAlignment: 1,
+            SettingsKeys.chimeInterval: 30,
+            SettingsKeys.chimeVolume: 50,
+            SettingsKeys.clickToShowTimerEnabled: true,
+            SettingsKeys.timerMode: "stopwatch",
+            SettingsKeys.timerGap: -13.0,
+            SettingsKeys.timerSide: 1,
+            SettingsKeys.pomodoroWorkDuration: 25,
+            SettingsKeys.pomodoroBreakDuration: 5,
+            SettingsKeys.pomodoroLongBreakDuration: 15,
+            SettingsKeys.pomodoroSessionsBeforeLongBreak: 4
+        ])
+    }
+
     // Generate a unique identifier for a screen based on its name and resolution
     static func screenIdentifier(for screen: NSScreen) -> String {
         let size = screen.frame.size
@@ -48,10 +76,15 @@ class SettingsManager {
         return "\(name)_\(Int(size.width))x\(Int(size.height))"
     }
 
+    // Get the screen macOS considers the main display.
+    static func mainDisplayScreen() -> NSScreen? {
+        return NSScreen.screens.first ?? NSScreen.main
+    }
+
     // Get the primary screen to use (largest screen in multi-monitor setups)
     static func primaryScreen() -> NSScreen? {
         guard let screens = NSScreen.screens as [NSScreen]?, !screens.isEmpty else {
-            return NSScreen.main
+            return mainDisplayScreen()
         }
         if screens.count == 1 {
             return screens.first
@@ -91,6 +124,11 @@ class SettingsManager {
             positions.removeValue(forKey: screenId)
         }
         perMonitorPositions = positions
+    }
+
+    func clearAllWindowPositions() {
+        perMonitorPositions = [:]
+        defaults.set(false, forKey: SettingsKeys.hasCustomPosition)
     }
 
     // Legacy windowPosition for backwards compatibility (uses current primary screen)
@@ -540,6 +578,7 @@ class SettingsWindowController: NSWindowController, NSWindowDelegate {
     var pomodoroSessionsRow: NSStackView!
     var onSettingsChanged: (() -> Void)?
     var onChimeIntervalChanged: (() -> Void)?
+    var onResetPosition: (() -> Void)?
 
     convenience init() {
         let window = NSWindow(
@@ -1297,8 +1336,7 @@ class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc func resetPosition() {
-        SettingsManager.shared.windowPosition = nil
-        onSettingsChanged?()
+        onResetPosition?()
     }
 
     @objc func visitGithub() {
@@ -1365,11 +1403,21 @@ class DraggableView: NSView {
     }
 }
 
-func calcWindowPosition(windowSize: CGSize, screenSize: CGSize) -> CGPoint {
+func calcWindowPosition(windowSize: CGSize, screenVisibleFrame: CGRect) -> CGPoint {
     // top-right only for now
-    return CGPointMake(
-        screenSize.width - windowSize.width,
-        screenSize.height - windowSize.height
+    return CGPoint(
+        x: screenVisibleFrame.maxX - windowSize.width,
+        y: screenVisibleFrame.maxY - windowSize.height
+    )
+}
+
+func clampWindowPosition(_ origin: CGPoint, windowSize: CGSize, screenVisibleFrame: CGRect) -> CGPoint {
+    let maxX = max(screenVisibleFrame.minX, screenVisibleFrame.maxX - windowSize.width)
+    let maxY = max(screenVisibleFrame.minY, screenVisibleFrame.maxY - windowSize.height)
+
+    return CGPoint(
+        x: min(max(origin.x, screenVisibleFrame.minX), maxX),
+        y: min(max(origin.y, screenVisibleFrame.minY), maxY)
     )
 }
 
@@ -1415,22 +1463,35 @@ class Clock: NSObject, NSApplicationDelegate {
         return round(timerWidth + halfGap + separatorWidth + halfGap)
     }
 
+    func storedPosition(forWindowOrigin origin: NSPoint) -> NSPoint {
+        let timerOffset = calculateTimerLeftOffset()
+        return NSPoint(x: origin.x + timerOffset, y: origin.y)
+    }
+
+    func windowOrigin(forStoredPosition storedPosition: NSPoint) -> NSPoint {
+        let timerOffset = calculateTimerLeftOffset()
+        return NSPoint(x: storedPosition.x - timerOffset, y: storedPosition.y)
+    }
+
+    func placeWindow(on screen: NSScreen, storedPosition: NSPoint?) {
+        let windowSize = window.frame.size
+        let visibleFrame = screen.visibleFrame
+
+        let origin: NSPoint
+        if let storedPosition {
+            origin = windowOrigin(forStoredPosition: storedPosition)
+        } else {
+            origin = calcWindowPosition(windowSize: windowSize, screenVisibleFrame: visibleFrame)
+        }
+
+        let clampedOrigin = clampWindowPosition(origin, windowSize: windowSize, screenVisibleFrame: visibleFrame)
+        window.setFrameOrigin(clampedOrigin)
+    }
+
     func updateWindowPosition() {
         guard let screen = SettingsManager.primaryScreen() else { return }
-        let timerOffset = calculateTimerLeftOffset()
         let settings = SettingsManager.shared
-
-        if let savedPos = settings.windowPosition(for: screen) {
-            // Adjust saved position to account for timer on left
-            let adjustedPos = NSPoint(x: savedPos.x - timerOffset, y: savedPos.y)
-            window.setFrameOrigin(adjustedPos)
-        } else {
-            let pos = calcWindowPosition(windowSize: self.window.frame.size,
-                                         screenSize: screen.frame.size)
-            // Adjust calculated position to account for timer on left
-            let adjustedPos = NSPoint(x: pos.x - timerOffset, y: pos.y)
-            window.setFrameOrigin(adjustedPos)
-        }
+        placeWindow(on: screen, storedPosition: settings.windowPosition(for: screen))
     }
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
@@ -1472,10 +1533,23 @@ class Clock: NSObject, NSApplicationDelegate {
 
     func setupMenu() {
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Madda Clock Settings...", action: #selector(openSettings), keyEquivalent: ""))
+        let settingsItem = NSMenuItem(title: "Madda Clock Settings...", action: #selector(openSettings), keyEquivalent: "")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+
+        let resetItem = NSMenuItem(title: "Reset Position", action: #selector(resetPosition), keyEquivalent: "")
+        resetItem.target = self
+        menu.addItem(resetItem)
+
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "Restart", action: #selector(restartApp), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: ""))
+        let restartItem = NSMenuItem(title: "Restart", action: #selector(restartApp), keyEquivalent: "")
+        restartItem.target = self
+        menu.addItem(restartItem)
+
+        let quitItem = NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
+        quitItem.target = NSApp
+        menu.addItem(quitItem)
+
         statusItem.menu = menu
     }
 
@@ -1488,10 +1562,26 @@ class Clock: NSObject, NSApplicationDelegate {
             settingsWindowController?.onChimeIntervalChanged = { [weak self] in
                 self?.scheduleNextChime()
             }
+            settingsWindowController?.onResetPosition = { [weak self] in
+                self?.resetPosition()
+            }
         }
         settingsWindowController?.showWindow(nil)
         settingsWindowController?.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc func resetPosition() {
+        guard let screen = SettingsManager.mainDisplayScreen() else { return }
+
+        SettingsManager.shared.clearAllWindowPositions()
+
+        let origin = calcWindowPosition(windowSize: window.frame.size, screenVisibleFrame: screen.visibleFrame)
+        let storedPosition = storedPosition(forWindowOrigin: origin)
+        SettingsManager.shared.setWindowPosition(storedPosition, for: screen)
+
+        window.setFrameOrigin(origin)
+        window.orderFrontRegardless()
     }
 
     @objc func restartApp() {
@@ -2010,9 +2100,10 @@ class Clock: NSObject, NSApplicationDelegate {
         let screen = SettingsManager.primaryScreen() ?? NSScreen.main!
         let pos: CGPoint
         if let savedPos = settings.windowPosition(for: screen) {
-            pos = savedPos
+            let windowOrigin = windowOrigin(forStoredPosition: savedPos)
+            pos = clampWindowPosition(windowOrigin, windowSize: size, screenVisibleFrame: screen.visibleFrame)
         } else {
-            pos = calcWindowPosition(windowSize: size, screenSize: screen.frame.size)
+            pos = calcWindowPosition(windowSize: size, screenVisibleFrame: screen.visibleFrame)
         }
 
         let rect = NSMakeRect(pos.x, pos.y, size.width, size.height)
@@ -2024,10 +2115,13 @@ class Clock: NSObject, NSApplicationDelegate {
         )
 
         draggableView = DraggableView(frame: NSMakeRect(0, 0, size.width, size.height))
-        draggableView.onPositionChanged = { newPos in
-            // Save position for the current primary screen
-            if let currentScreen = SettingsManager.primaryScreen() {
-                SettingsManager.shared.setWindowPosition(newPos, for: currentScreen)
+        draggableView.onPositionChanged = { [weak self] newPos in
+            guard let self else { return }
+
+            // Save the clock anchor position for the screen the window is actually on.
+            let storedPosition = self.storedPosition(forWindowOrigin: newPos)
+            if let currentScreen = self.window.screen ?? SettingsManager.mainDisplayScreen() ?? SettingsManager.primaryScreen() {
+                SettingsManager.shared.setWindowPosition(storedPosition, for: currentScreen)
             }
         }
         draggableView.onClockClicked = { [weak self] in
